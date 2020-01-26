@@ -1,31 +1,46 @@
-﻿using Newtonsoft.Json;
-using NLog;
+﻿using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 using RabbitMQ.Client;
 using System;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace RabbitMqManager
 {
     internal sealed class PushService : BaseManager, IPushService
     {
-        private ConnectionFactory Factory
+        private ConnectionFactory Factory => new ConnectionFactory
         {
-            get
-            {
-                return _factory ?? (_factory = new ConnectionFactory
-                {
-                    UserName = UserName,
-                    Password = Password,
-                    VirtualHost = VirtualHost,
-                    HostName = HostName,
-                    AutomaticRecoveryEnabled = true,
-                    NetworkRecoveryInterval = TimeSpan.FromSeconds(10),
-                    RequestedHeartbeat = 60
-                });
-            }
-        }
+            UserName = UserName,
+            Password = Password,
+            VirtualHost = VirtualHost,
+            HostName = HostName,
+            Port = Port,
+            ContinuationTimeout = TimeSpan.FromMilliseconds(ContinuationTimeout),
+            AutomaticRecoveryEnabled = true,
+            NetworkRecoveryInterval = TimeSpan.FromSeconds(10),
+            RequestedHeartbeat = 60,
+        };
+        //{
+        //    get
+        //    {
+        //        return _factory ?? (_factory = new ConnectionFactory
+        //        {
+        //            UserName = UserName,
+        //            Password = Password,
+        //            VirtualHost = VirtualHost,
+        //            HostName = HostName,
+        //            Port = Port,
+        //            ContinuationTimeout = TimeSpan.FromMilliseconds(ContinuationTimeout),
+        //            AutomaticRecoveryEnabled = true,
+        //            NetworkRecoveryInterval = TimeSpan.FromSeconds(10),
+        //            RequestedHeartbeat = 60,
+        //        });
+        //    }
+        //}
 
-        private PushService() { }
+        private PushService() : base()
+        { }
 
         public static PushService CreateManager(Action<IPushService> configure)
         {
@@ -36,7 +51,17 @@ namespace RabbitMqManager
             return mngr;
         }
 
-        public override bool PushMessage<T>(T message, string routingKey = "") 
+        public async override Task<bool> PushMessageAsync<T>(T message, string routingKey = "")
+        {
+            if (message is null)
+            {
+                throw new ArgumentException($"{nameof(PushMessageAsync)}: Empty message.");
+            }
+
+            return await Task.Run(() => PushMessage(message, routingKey));
+        }
+
+        private bool PushMessage<T>(T message, string routingKey = "")
         {
             try
             {
@@ -55,8 +80,7 @@ namespace RabbitMqManager
             }
             catch (Exception e)
             {
-                _logger.Error(e);
-                return false;
+                throw;
             }
         }
     }

@@ -1,12 +1,7 @@
-﻿using DataTransferObjects;
-using RabbitMqManager;
+﻿using RabbitMqManager;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace SimpleTestApp
+namespace ExampleConsoleApp
 {
     class Program
     {
@@ -45,7 +40,7 @@ namespace SimpleTestApp
                     Message = message
                 };
 
-                mqMngr.PushMessage(dto);
+                mqMngr.PushMessageAsync(dto);
             }
 
             mqMngr.ConnectionRecoveredEvent -= RabbitConnectionRecovered;

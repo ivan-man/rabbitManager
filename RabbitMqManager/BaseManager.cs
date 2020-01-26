@@ -1,27 +1,35 @@
-﻿using NLog;
+﻿using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace RabbitMqManager
 {
     public abstract class BaseManager : IBaseManager
     {
-        protected readonly ILogger _logger = LogManager.GetCurrentClassLogger();
-
         protected IConnection _connection;
         protected IModel _channel;
         protected ConnectionFactory _factory;
 
+        ///<inheritdoc cref="IBaseManager.UserName"/>
         public string UserName { get; protected set; }
+
+        ///<inheritdoc cref="IBaseManager.Password"/>
         public string Password { get; protected set; }
+
+        ///<inheritdoc cref="IBaseManager.VirtualHost"/>
         public string VirtualHost { get; protected set; }
+
+        ///<inheritdoc cref="IBaseManager.HostName"/>
         public string HostName { get; protected set; }
 
+        ///<inheritdoc cref="IBaseManager.Port"/>
+        public int Port { get; protected set; }
+
+        ///<inheritdoc cref="IBaseManager.ContinuationTimeout"/>
+        public int ContinuationTimeout { get; protected set; }
+
         private string _exchangePrefix;
+        ///<inheritdoc cref="IBaseManager.ExchangePrefix"/>
         public string ExchangePrefix
         {
             get
@@ -34,28 +42,47 @@ namespace RabbitMqManager
             }
         }
 
-        protected BaseManager() { }
+        protected BaseManager() 
+        {
+        }
 
+        ///<inheritdoc cref="IBaseManager.SetUserName(string)"/>
         public virtual void SetUserName(string userName)
         {
             UserName = userName;
         }
 
+        ///<inheritdoc cref="IBaseManager.SetPassword(string)"/>
         public virtual void SetPassword(string password)
         {
             Password = password;
         }
 
+        ///<inheritdoc cref="IBaseManager.SetVirtualHost(string)"/>
         public virtual void SetVirtualHost(string virtualHost)
         {
             VirtualHost = virtualHost;
         }
 
+        ///<inheritdoc cref="IBaseManager.SetHostName(string)"/>
         public virtual void SetHostName(string hostName)
         {
             HostName = hostName;
         }
 
+        ///<inheritdoc cref="IBaseManager.SetPort(int)"/>
+        public virtual void SetPort(int port)
+        {
+            Port = port;
+        }
+
+        ///<inheritdoc cref="IBaseManager.SetContinuationTimeout(int)"/>
+        public virtual void SetContinuationTimeout(int timeOut)
+        {
+            ContinuationTimeout = timeOut;
+        }
+
+        ///<inheritdoc cref="IBaseManager.SetExchangePrefix(string)"/>
         public virtual void SetExchangePrefix(string exchangePrefix)
         {
             ExchangePrefix = exchangePrefix;
@@ -66,6 +93,6 @@ namespace RabbitMqManager
             return $"{ExchangePrefix}:{typeof(T).ToString()}";
         }
 
-        public abstract bool PushMessage<T>(T message, string routingKey = "") where T : class;
+        public abstract Task<bool> PushMessageAsync<T>(T message, string routingKey = "");
     }
 }

@@ -1,7 +1,4 @@
-﻿using RabbitMqManager.Extensions;
-using Newtonsoft.Json;
-using RabbitMQ.Client.Events;
-using System;
+﻿using System;
 using RabbitMqManager.Helpers;
 
 namespace RabbitMqManager
@@ -17,9 +14,10 @@ namespace RabbitMqManager
             Handling = handling;
         }
 
+        //ToDo generic?
         public void Receive(object obj)
         {
-            var message = DeserializeHelper<T>.Deserialize(obj);
+            var message = DeserializeHelper<T>.Deserialize(obj.ToString());
             if (message != null)
             {
                 Handling.Invoke(message);

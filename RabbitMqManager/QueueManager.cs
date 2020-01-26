@@ -1,5 +1,4 @@
 ﻿using RabbitMqManager.Extensions;
-using NLog;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using System;
@@ -7,6 +6,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
+using RabbitMqManager.Configs;
+using Microsoft.Extensions.Logging;
+using System.Threading.Tasks;
 
 namespace RabbitMqManager
 {
@@ -96,8 +98,10 @@ namespace RabbitMqManager
 
         #endregion Properties
 
+
         #region .ctor
-        private QueueManager() { }
+        private QueueManager() : base()
+        { }
 
         #endregion .ctor
 
@@ -116,6 +120,7 @@ namespace RabbitMqManager
                 NetworkRecoveryInterval = NetworkRecoveryInterval,
                 RequestedHeartbeat = Heartbeat
             };
+
             try
             {
                 var newConnection = _factory.CreateConnection();
@@ -124,17 +129,17 @@ namespace RabbitMqManager
             }
             catch (Exception e)
             {
-                _logger.Error(e, "Failed to create connection");
-                Thread.Sleep(ReconnectTimeout * 1000);
-                return null;
+                throw;
             }
         }
 
+        /// <inheritdoc cref="IQueueManager.AddConsumer{T}(string, Action{T}, bool)"/>
         public void AddConsumer<T>(string queue, Action<T> handling, bool cleanQueue) where T : class
         {
             AddConsumer(queue, string.Empty, handling, cleanQueue);
         }
 
+        /// <inheritdoc cref="IQueueManager.AddConsumer{T}(string, string, Action{T}, bool)"/>
         public void AddConsumer<T>(string queue, string routingKey, Action<T> handling, bool cleanQueue) where T : class
         {
             if (Channel?.IsOpen != true) throw new IOException("Channel is closed");
@@ -154,7 +159,7 @@ namespace RabbitMqManager
                     }
                     catch (Exception e)
                     {
-                        _logger.Warn(e, $"Can't purge {queue}");
+                        throw;
                     }
                 }
 
@@ -202,6 +207,7 @@ namespace RabbitMqManager
             Channel.BasicConsume(queue: queue, autoAck: true, consumer: basicConsumer);
         }
 
+        /// <inheritdoc cref="IQueueManager.RemoveConsumer{T}(string, string)"/>
         public void RemoveConsumer<T>(string queue, string routingKey = "")
         {
             var exchange = GetExchange<T>();
@@ -214,6 +220,40 @@ namespace RabbitMqManager
             ConsumersDic.Remove(consumerKey);
         }
 
+        /// <summary>
+        /// Create new instance of <see cref="IQueueManager"/>.
+        /// </summary>
+        /// <param name="configureAction">Initiation method.</param>
+        /// <param name="config">Rabbit connection attributes.</param>
+        public static IQueueManager CreateManager(Action<IQueueManager, IRabbitMqConfig> configureAction, IRabbitMqConfig config)
+        {
+            if (configureAction == null)
+            {
+                throw new ArgumentNullException("No configure method");
+            }
+
+            var mngr = new QueueManager();
+
+            configureAction.Invoke(mngr, config);
+
+            mngr._pushService = PushService.CreateManager((pusher) =>
+            {
+                pusher.SetHostName(mngr.HostName);
+                pusher.SetPassword(mngr.Password);
+                pusher.SetUserName(mngr.UserName);
+                pusher.SetVirtualHost(mngr.VirtualHost);
+                pusher.SetExchangePrefix(mngr.ExchangePrefix);
+                pusher.SetPort(mngr.Port);
+                pusher.SetContinuationTimeout(mngr.ContinuationTimeout);
+            });
+
+            return mngr;
+        }
+
+        /// <summary>
+        /// Create new instance of <see cref="IQueueManager"/>.
+        /// </summary>
+        /// <param name="configure"></param>
         public static IQueueManager CreateManager(Action<IQueueManager> configure)
         {
             if (configure == null)
@@ -231,14 +271,22 @@ namespace RabbitMqManager
                 pusher.SetUserName(mngr.UserName);
                 pusher.SetVirtualHost(mngr.VirtualHost);
                 pusher.SetExchangePrefix(mngr.ExchangePrefix);
+                pusher.SetPort(mngr.Port);
+                pusher.SetContinuationTimeout(mngr.ContinuationTimeout);
             });
 
             return mngr;
         }
         
-        public override bool PushMessage<T>(T message, string routingKey = "") 
+        /// <summary>
+        /// Send new message into bus.
+        /// </summary>
+        /// <typeparam name="T">Type of object.</typeparam>
+        /// <param name="message">Serialized object.</param>
+        /// <param name="routingKey">Routing key.</param>
+        public async override Task<bool> PushMessageAsync<T>(T message, string routingKey = "") 
         {
-            return _pushService.PushMessage(message, routingKey);
+            return await _pushService.PushMessageAsync(message, routingKey);
         }
 
         private void ConnectionShutdown(object sender, ShutdownEventArgs e)
@@ -249,8 +297,6 @@ namespace RabbitMqManager
             }
 
             OnConnectionShutdown(sender, e);
-
-            _logger.Error("Rabbit connection lost.");
 
             Reconnect();
         }
@@ -264,35 +310,37 @@ namespace RabbitMqManager
                 try
                 {
                     RestartConsumers();
-                    _logger.Warn("Reconnected to Rabbit");
-
                     OnConnectionRecovered();
 
                     break;
                 }
                 catch (Exception ex)
                 {
-                    _logger.Warn("Reconnect to Rabbit failed");
-                    Thread.Sleep(ReconnectTimeout * 1000);
+                    Task.Delay(ReconnectTimeout * 1000).Wait();
                 }
             }
         }
 
         /// <summary>
-        /// Purge the queue from messages
+        /// Purge the queue from messages.
         /// </summary>
         public void QueuePurge(string queue)
         {
             Channel.QueuePurge(queue);
         }
 
-
+        /// <summary>
+        /// Connect.
+        /// </summary>
         public void Connect()
         {
             _disabled = false;
             Reconnect();
         }
 
+        /// <summary>
+        /// Disable.
+        /// </summary>
         public void Disable()
         {
             _disabled = true;
@@ -315,40 +363,13 @@ namespace RabbitMqManager
             }
             catch (IOException ex)
             {
-                _logger.Error(ex, "Can't clean connection");
+                throw;
             }
             catch (Exception ex)
             {
-                _logger.Error(ex, "Can't clean connection");
+                throw;
             }
         }
-
-        public override void SetUserName(string userName)
-        {
-            base.SetUserName(userName);
-        }
-
-        public override void SetPassword(string password)
-        {
-            base.SetPassword(password);
-        }
-
-        public override void SetVirtualHost(string virtualHost)
-        {
-            base.SetVirtualHost(virtualHost);
-        }
-
-        public override void SetHostName(string hostName)
-        {
-            base.SetHostName(hostName);
-        }
-
-        public override void SetExchangePrefix(string exchangePrefix)
-        {
-            base.SetExchangePrefix(exchangePrefix);
-        }
-
-
 
         #endregion Methods
     }
