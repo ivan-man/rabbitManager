@@ -10,9 +10,7 @@ namespace ExampleConsoleApp
 
         public override string ToString()
         {
-            var str = $"{(Guid != Guid.Empty ? Guid.ToString() + Environment.NewLine : string.Empty)}";
-            str += $"{Id}: {Message}";
-
+            var str = $"{(Guid != Guid.Empty ? Guid.ToString() + Environment.NewLine : string.Empty)}{Id}: {Message}";
             return str;
         }
     }
