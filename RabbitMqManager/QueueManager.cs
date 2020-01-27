@@ -7,7 +7,6 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using RabbitMqManager.Configs;
-using Microsoft.Extensions.Logging;
 using System.Threading.Tasks;
 
 namespace RabbitMqManager
