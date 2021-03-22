@@ -22,10 +22,10 @@ namespace RabbitMqManager
         public string HostName { get; protected set; }
 
         ///<inheritdoc cref="IBaseManager.Port"/>
-        public int Port { get; protected set; }
+        public int Port { get; protected set; } = 5672;
 
         ///<inheritdoc cref="IBaseManager.ContinuationTimeout"/>
-        public int ContinuationTimeout { get; protected set; }
+        public int ContinuationTimeout { get; protected set; } = 10;
 
         private string _exchangePrefix;
         ///<inheritdoc cref="IBaseManager.ExchangePrefix"/>

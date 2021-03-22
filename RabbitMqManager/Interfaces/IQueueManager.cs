@@ -30,7 +30,7 @@ namespace RabbitMqManager
         /// <summary>
         /// Heartbeat timeout to use when negotiating with the server (in seconds).  Default to 60s.
         /// </summary>
-        ushort Heartbeat { get; set; }
+        TimeSpan Heartbeat { get; set; }
 
         /// <summary>
         /// Set to false to disable automatic connection recovery. Defaults to true.

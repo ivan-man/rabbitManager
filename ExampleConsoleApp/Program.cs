@@ -12,6 +12,7 @@ namespace ExampleConsoleApp
                 mngr.SetUserName("guest");
                 mngr.SetPassword("guest");
                 mngr.SetHostName("localhost");
+                mngr.SetPort(5672);
                 mngr.SetVirtualHost("/");
 
                 mngr.SetExchangePrefix("myTestExchange");

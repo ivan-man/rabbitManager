@@ -15,10 +15,10 @@ namespace RabbitMqManager
             VirtualHost = VirtualHost,
             HostName = HostName,
             Port = Port,
-            ContinuationTimeout = TimeSpan.FromMilliseconds(ContinuationTimeout),
+            ContinuationTimeout = TimeSpan.FromSeconds(ContinuationTimeout),
             AutomaticRecoveryEnabled = true,
             NetworkRecoveryInterval = TimeSpan.FromSeconds(10),
-            RequestedHeartbeat = 60,
+            RequestedHeartbeat = new TimeSpan(0,0,60),
         };
         //{
         //    get

@@ -35,7 +35,7 @@ namespace RabbitMqManager
 
 
         #region fields
-       
+
 
         private IPushService _pushService;
 
@@ -54,7 +54,7 @@ namespace RabbitMqManager
         /// <summary>
         /// Heartbeat timeout to use when negotiating with the server (in seconds).  Default to 60 s
         /// </summary>
-        public ushort Heartbeat { get; set; } = 60;
+        public TimeSpan Heartbeat { get; set; } = new TimeSpan(0, 0, 60);
 
         /// <summary>
         /// Set to false to disable automatic connection recovery. Defaults to true.
@@ -183,7 +183,7 @@ namespace RabbitMqManager
 
                 foreach (var pair in ConsumersDic.Where(q => q.Value.Queue.Equals(queue)))
                 {
-                    Channel.ExchangeDeclare(exchange:  pair.Key, type: "fanout");
+                    Channel.ExchangeDeclare(exchange: pair.Key, type: "fanout");
                     Channel.QueueBind(queue: queue, exchange: pair.Key, routingKey: pair.Value.RoutingKey);
                 }
 
@@ -276,14 +276,14 @@ namespace RabbitMqManager
 
             return mngr;
         }
-        
+
         /// <summary>
         /// Send new message into bus.
         /// </summary>
         /// <typeparam name="T">Type of object.</typeparam>
         /// <param name="message">Serialized object.</param>
         /// <param name="routingKey">Routing key.</param>
-        public async override Task<bool> PushMessageAsync<T>(T message, string routingKey = "") 
+        public async override Task<bool> PushMessageAsync<T>(T message, string routingKey = "")
         {
             return await _pushService.PushMessageAsync(message, routingKey);
         }
