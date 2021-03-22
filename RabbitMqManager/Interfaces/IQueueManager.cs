@@ -3,7 +3,7 @@ using System;
 
 namespace RabbitMqManager
 {
-    public interface IQueueManager : IBaseManager
+    public interface IQueueManager : IBaseManager, IDisposable
     {
         /// <summary>
         /// Detailed lost connection with bus.
@@ -83,6 +83,6 @@ namespace RabbitMqManager
         /// <summary>
         /// Disable connection.
         /// </summary>
-        void Disable();
+        void Dispose();
     }
 }

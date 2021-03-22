@@ -1,8 +1,9 @@
-﻿using System.Threading.Tasks;
+﻿using System;
+using System.Threading.Tasks;
 
 namespace RabbitMqManager
 {
-    public interface IBaseManager
+    public interface IBaseManager 
     {
         /// <inheritdoc cref="RabbitMQ.Client.ConnectionFactory.UserName"/>
         string UserName { get; }

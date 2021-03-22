@@ -7,7 +7,7 @@ namespace ExampleConsoleApp
     {
         static void Main(string[] args)
         {
-            IQueueManager mqMngr = QueueManager.CreateManager(new Action<IQueueManager>((mngr) =>
+            using IQueueManager mqMngr = QueueManager.CreateManager(new Action<IQueueManager>((mngr) =>
             {
                 mngr.SetUserName("guest");
                 mngr.SetPassword("guest");
@@ -45,7 +45,6 @@ namespace ExampleConsoleApp
 
             mqMngr.ConnectionRecoveredEvent -= RabbitConnectionRecovered;
             mqMngr.ConnectionShutdownEvent -= RabbitConnectionShutdown;
-            mqMngr.Disable();
         }
 
         private static void RabbitConnectionShutdown(object sender, EventArgs e)

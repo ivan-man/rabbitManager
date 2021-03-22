@@ -338,9 +338,9 @@ namespace RabbitMqManager
         }
 
         /// <summary>
-        /// Disable.
+        /// Dispose.
         /// </summary>
-        public void Disable()
+        public void Dispose()
         {
             _disabled = true;
             Cleanup();
