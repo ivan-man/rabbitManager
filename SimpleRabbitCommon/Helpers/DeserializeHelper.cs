@@ -1,8 +1,7 @@
 ﻿using Newtonsoft.Json;
 using System;
-using System.Text;
 
-namespace RabbitMqManager.Helpers
+namespace SimpleRabbit.Common.Helpers
 {
     public static class DeserializeHelper<T> where T : class
     {

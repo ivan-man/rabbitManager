@@ -1,7 +1,7 @@
 ﻿using System;
-using RabbitMqManager.Helpers;
+using SimpleRabbit.Common.Helpers;
 
-namespace RabbitMqManager
+namespace SimpleRabbit.Cunsuming
 {
     internal class Consumer<T> : IConsumer where T : class
     {

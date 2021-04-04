@@ -1,18 +1,29 @@
-﻿using RabbitMqManager.Extensions;
+﻿using Microsoft.Extensions.Configuration;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
+using RabbitMQ.Client.Exceptions;
+using SimpleRabbit.Common.Configs;
+using SimpleRabbit.Common.Extensions;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Threading;
-using RabbitMqManager.Configs;
 using System.Threading.Tasks;
 
-namespace RabbitMqManager
+namespace SimpleRabbit.Cunsuming
 {
-    public sealed class QueueManager : BaseManager, IQueueManager
+    public sealed class ConsumeManager : IConsumeManager
     {
+        private const string _defaultSection = "rabbitMq";
+
+        private IConnection _connection;
+        private IModel _channel;
+        private ConnectionFactory _factory;
+
+        private IRabbitMqConfig _rabbitSettings;
+
+        private bool _disabled;
+
         #region events 
 
         public event EventHandler<ShutdownEventArgs> ConnectionShutdownDetailedEvent;
@@ -35,11 +46,6 @@ namespace RabbitMqManager
 
 
         #region fields
-
-
-        private IPushService _pushService;
-
-        private bool _disabled;
         #endregion fields
 
 
@@ -92,6 +98,14 @@ namespace RabbitMqManager
             }
         }
 
+        public string UserName { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
+        public string Password { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
+        public string VirtualHost { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
+        public string HostName { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
+        public int Port { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
+        public int ContinuationTimeout { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
+        public string ExchangePrefix { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
+
         private readonly HashSet<string> BindedQueues = new HashSet<string>();
         private readonly Dictionary<string, IConsumer> ConsumersDic = new Dictionary<string, IConsumer>();
 
@@ -99,22 +113,46 @@ namespace RabbitMqManager
 
 
         #region .ctor
-        private QueueManager() : base()
-        { }
+        private ConsumeManager(IRabbitMqConfig config) 
+        {
+            _rabbitSettings = config;
+        }
+
+        public ConsumeManager(IConfiguration configuration, string sectionName = _defaultSection)
+        {
+            configuration.GetSection(sectionName).Bind(_rabbitSettings);
+        }
 
         #endregion .ctor
 
 
         #region Methods
 
+        /// <summary>
+        /// Create new instance of <see cref="IConsumeManager"/>.
+        /// </summary>
+        /// <param name="configureAction">Initiation method.</param>
+        /// <param name="config">Rabbit connection attributes.</param>
+        public static IConsumeManager Create(IRabbitMqConfig config)
+        {
+            if (config == null)
+            {
+                throw new ArgumentNullException(nameof(config));
+            }
+
+            var mngr = new ConsumeManager(config);
+
+            return mngr;
+        }
+
         private IConnection GetConnection()
         {
             _factory = new ConnectionFactory
             {
-                UserName = UserName,
-                Password = Password,
-                VirtualHost = VirtualHost,
-                HostName = HostName,
+                UserName = _rabbitSettings.UserName,
+                Password = _rabbitSettings.Password,
+                VirtualHost = _rabbitSettings.VirtualHost,
+                HostName = _rabbitSettings.HostName,
                 AutomaticRecoveryEnabled = AutomaticRecoveryEnabled,
                 NetworkRecoveryInterval = NetworkRecoveryInterval,
                 RequestedHeartbeat = Heartbeat
@@ -132,14 +170,14 @@ namespace RabbitMqManager
             }
         }
 
-        /// <inheritdoc cref="IQueueManager.AddConsumer{T}(string, Action{T}, bool)"/>
-        public void AddConsumer<T>(string queue, Action<T> handling, bool cleanQueue) where T : class
+        /// <inheritdoc cref="IConsumeManager.AddConsumer{T}(string, Action{T}, bool)"/>
+        public void AddConsumer<T>(string queue, Action<T> handling, bool cleanQueue, string exchangeType = "fanout") where T : class
         {
-            AddConsumer(queue, string.Empty, handling, cleanQueue);
+            AddConsumer(queue, string.Empty, handling, cleanQueue, exchangeType);
         }
 
-        /// <inheritdoc cref="IQueueManager.AddConsumer{T}(string, string, Action{T}, bool)"/>
-        public void AddConsumer<T>(string queue, string routingKey, Action<T> handling, bool cleanQueue) where T : class
+        /// <inheritdoc cref="IConsumeManager.AddConsumer{T}(string, string, Action{T}, bool)"/>
+        public void AddConsumer<T>(string queue, string routingKey, Action<T> handling, bool cleanQueue, string exchangeType = "fanout") where T : class
         {
             if (Channel?.IsOpen != true) throw new IOException("Channel is closed");
 
@@ -156,6 +194,10 @@ namespace RabbitMqManager
                     {
                         Channel.QueuePurge(queue);
                     }
+                    catch (OperationInterruptedException e)
+                    {
+                        // if no queue do nothing
+                    }
                     catch (Exception e)
                     {
                         throw;
@@ -169,7 +211,7 @@ namespace RabbitMqManager
                 BindedQueues.Add(queue);
             }
 
-            Channel.ExchangeDeclare(exchange: exchange, type: "fanout");
+            Channel.ExchangeDeclare(exchange: exchange, type: exchangeType);
             Channel.QueueBind(queue, exchange, routingKey);
 
             ConsumersDic.Add(exchange, new Consumer<T>(queue, routingKey, handling));
@@ -206,7 +248,7 @@ namespace RabbitMqManager
             Channel.BasicConsume(queue: queue, autoAck: true, consumer: basicConsumer);
         }
 
-        /// <inheritdoc cref="IQueueManager.RemoveConsumer{T}(string, string)"/>
+        /// <inheritdoc cref="IConsumeManager.RemoveConsumer{T}(string, string)"/>
         public void RemoveConsumer<T>(string queue, string routingKey = "")
         {
             var exchange = GetExchange<T>();
@@ -219,75 +261,11 @@ namespace RabbitMqManager
             ConsumersDic.Remove(consumerKey);
         }
 
-        /// <summary>
-        /// Create new instance of <see cref="IQueueManager"/>.
-        /// </summary>
-        /// <param name="configureAction">Initiation method.</param>
-        /// <param name="config">Rabbit connection attributes.</param>
-        public static IQueueManager CreateManager(Action<IQueueManager, IRabbitMqConfig> configureAction, IRabbitMqConfig config)
+        private string GetExchange<T>()
         {
-            if (configureAction == null)
-            {
-                throw new ArgumentNullException("No configure method");
-            }
-
-            var mngr = new QueueManager();
-
-            configureAction.Invoke(mngr, config);
-
-            mngr._pushService = PushService.CreateManager((pusher) =>
-            {
-                pusher.SetHostName(mngr.HostName);
-                pusher.SetPassword(mngr.Password);
-                pusher.SetUserName(mngr.UserName);
-                pusher.SetVirtualHost(mngr.VirtualHost);
-                pusher.SetExchangePrefix(mngr.ExchangePrefix);
-                pusher.SetPort(mngr.Port);
-                pusher.SetContinuationTimeout(mngr.ContinuationTimeout);
-            });
-
-            return mngr;
+            return $"{_rabbitSettings.ExchangePrefix}:{typeof(T)}";
         }
-
-        /// <summary>
-        /// Create new instance of <see cref="IQueueManager"/>.
-        /// </summary>
-        /// <param name="configure"></param>
-        public static IQueueManager CreateManager(Action<IQueueManager> configure)
-        {
-            if (configure == null)
-            {
-                throw new ArgumentNullException("No configure method");
-            }
-
-            var mngr = new QueueManager();
-            configure.Invoke(mngr);
-
-            mngr._pushService = PushService.CreateManager((pusher) =>
-            {
-                pusher.SetHostName(mngr.HostName);
-                pusher.SetPassword(mngr.Password);
-                pusher.SetUserName(mngr.UserName);
-                pusher.SetVirtualHost(mngr.VirtualHost);
-                pusher.SetExchangePrefix(mngr.ExchangePrefix);
-                pusher.SetPort(mngr.Port);
-                pusher.SetContinuationTimeout(mngr.ContinuationTimeout);
-            });
-
-            return mngr;
-        }
-
-        /// <summary>
-        /// Send new message into bus.
-        /// </summary>
-        /// <typeparam name="T">Type of object.</typeparam>
-        /// <param name="message">Serialized object.</param>
-        /// <param name="routingKey">Routing key.</param>
-        public async override Task<bool> PushMessageAsync<T>(T message, string routingKey = "")
-        {
-            return await _pushService.PushMessageAsync(message, routingKey);
-        }
-
+        
         private void ConnectionShutdown(object sender, ShutdownEventArgs e)
         {
             if (Connection != null)

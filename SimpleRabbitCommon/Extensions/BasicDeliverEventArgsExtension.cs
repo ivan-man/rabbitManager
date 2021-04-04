@@ -1,10 +1,8 @@
-﻿using Newtonsoft.Json;
-using RabbitMQ.Client.Events;
-using RabbitMqManager.Helpers;
-using System;
+﻿using RabbitMQ.Client.Events;
+using SimpleRabbit.Common.Helpers;
 using System.Text;
 
-namespace RabbitMqManager.Extensions
+namespace SimpleRabbit.Common.Extensions
 {
     public static class BasicDeliverEventArgsExtension
     {

@@ -1,7 +1,7 @@
 ﻿using RabbitMQ.Client.Events;
 using System;
 
-namespace RabbitMqManager
+namespace SimpleRabbit.Cunsuming
 {
     /// <summary>
     /// Consumer of messages.

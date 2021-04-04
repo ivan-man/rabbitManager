@@ -1,27 +1,33 @@
-﻿using RabbitMqManager;
+﻿using SimpleRabbit.Common.Configs;
+using SimpleRabbit.Cunsuming;
+using SimpleRabbit.Publisher;
 using System;
+using System.Threading.Tasks;
 
 namespace ExampleConsoleApp
 {
     class Program
     {
-        static void Main(string[] args)
+        static async Task Main(string[] args)
         {
-            using IQueueManager mqMngr = QueueManager.CreateManager(new Action<IQueueManager>((mngr) =>
+            var settings = new RabbitMqConfig
             {
-                mngr.SetUserName("guest");
-                mngr.SetPassword("guest");
-                mngr.SetHostName("localhost");
-                mngr.SetPort(5672);
-                mngr.SetVirtualHost("/");
+                HostName = "localhost",
+                Port = 5672,
+                UserName = "guest",
+                Password = "guest",
+                VirtualHost = "/",
+                ExchangePrefix = "myTestExchange",
+            };
 
-                mngr.SetExchangePrefix("myTestExchange");
+            using var consumeMngr = ConsumeManager.Create(settings);
+            consumeMngr.AddConsumer("myTestQueue2", new Action<TestDto>(TestConsumer.ProcessMessage), true);
 
-                mngr.AddConsumer("myTestQueue", new Action<TestDto>(TestConsumer.ProcessMessage), true);
+            consumeMngr.ConnectionRecoveredEvent += RabbitConnectionRecovered;
+            consumeMngr.ConnectionShutdownEvent += RabbitConnectionShutdown;
 
-                mngr.ConnectionRecoveredEvent += RabbitConnectionRecovered;
-                mngr.ConnectionShutdownEvent += RabbitConnectionShutdown;
-            }));
+
+            var pubSrv = PublishService.Create(settings);
 
             Console.WriteLine("App started");
 
@@ -41,11 +47,13 @@ namespace ExampleConsoleApp
                     Message = message
                 };
 
-                mqMngr.PushMessageAsync(dto);
+                await pubSrv.PublishAsync(dto);
+
+                pubSrv.Publish(dto);
             }
 
-            mqMngr.ConnectionRecoveredEvent -= RabbitConnectionRecovered;
-            mqMngr.ConnectionShutdownEvent -= RabbitConnectionShutdown;
+            consumeMngr.ConnectionRecoveredEvent -= RabbitConnectionRecovered;
+            consumeMngr.ConnectionShutdownEvent -= RabbitConnectionShutdown;
         }
 
         private static void RabbitConnectionShutdown(object sender, EventArgs e)
