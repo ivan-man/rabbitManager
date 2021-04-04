@@ -214,7 +214,7 @@ namespace SimpleRabbit.Cunsuming
             Channel.ExchangeDeclare(exchange: exchange, type: exchangeType);
             Channel.QueueBind(queue, exchange, routingKey);
 
-            ConsumersDic.Add(exchange, new Consumer<T>(queue, routingKey, handling));
+            ConsumersDic.Add(exchange, new Consumer<T>(queue, routingKey, handling, exchangeType));
         }
 
         private void RestartConsumers()
@@ -225,7 +225,7 @@ namespace SimpleRabbit.Cunsuming
 
                 foreach (var pair in ConsumersDic.Where(q => q.Value.Queue.Equals(queue)))
                 {
-                    Channel.ExchangeDeclare(exchange: pair.Key, type: "fanout");
+                    Channel.ExchangeDeclare(exchange: pair.Key, type: pair.Value.ExchangeType);
                     Channel.QueueBind(queue: queue, exchange: pair.Key, routingKey: pair.Value.RoutingKey);
                 }
 

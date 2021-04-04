@@ -8,10 +8,12 @@ namespace SimpleRabbit.Cunsuming
         public Action<T> Handling { get; }
         public string Queue { get; private set; }
         public string RoutingKey { get; private set; }
+        public string ExchangeType { get; private set; }
 
-        internal Consumer(string queue, string routingKey, Action<T> handling)
+        internal Consumer(string queue, string routingKey, Action<T> handling, string exchangeType = "fanout")
         {
             Handling = handling;
+            ExchangeType = exchangeType;
         }
 
         //ToDo generic?

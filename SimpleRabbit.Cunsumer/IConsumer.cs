@@ -23,5 +23,7 @@ namespace SimpleRabbit.Cunsuming
         /// </summary>
         /// <param name="e">Message.</param>
         void Receive(object e);
+
+        string ExchangeType { get; }
     }
 }
