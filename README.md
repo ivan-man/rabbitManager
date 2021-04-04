@@ -1,2 +1,2 @@
-# rabbitMQ Manager
-Simple facade of RabbitMq.Client.
+# Simple interaction with  inrabbitMQ 
+Wrapper over the RabbitMq.Client.
