@@ -6,7 +6,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\SimpleRabbit.Cunsumer\SimpleRabbit.Cunsuming.csproj" />
-    <ProjectReference Include="..\SimpleRabbitPusher\SimpleRabbit.Publisher.csproj" />
+    <ProjectReference Include="..\SimpleRabbit.Pusher\SimpleRabbit.Publisher.csproj" />
   </ItemGroup>
 
 </Project>

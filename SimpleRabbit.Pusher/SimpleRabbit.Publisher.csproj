@@ -13,6 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\SimpleRabbit.Common\SimpleRabbit.Common.csproj" />
     <ProjectReference Include="..\SimpleRabbitCommon\SimpleRabbit.Common.csproj" />
   </ItemGroup>
 
