@@ -25,8 +25,16 @@ namespace SimpleRabbit.Common.Configs
         /// <inheritdoc cref="IRabbitMqConfig.Port"/>
         public int Port { get; set; }
 
+        /// <inheritdoc cref="IRabbitMqConfig.ContinuationTimeoutSec"/>
         public int ContinuationTimeoutSec { get; set; } = 10;
 
+        /// <inheritdoc cref="IRabbitMqConfig.NetworkRecoveryIntervalSec"/>
         public int NetworkRecoveryIntervalSec { get; set; } = 10;
+
+        /// <inheritdoc cref="IRabbitMqConfig.HeartbeatSec"/>
+        public int HeartbeatSec { get; set; } = 10;
+
+        /// <inheritdoc cref="IRabbitMqConfig.AutomaticRecoveryEnabled"/>
+        public bool AutomaticRecoveryEnabled { get; set; } = true;
     }
 }

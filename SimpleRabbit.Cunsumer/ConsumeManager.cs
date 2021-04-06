@@ -14,16 +14,6 @@ namespace SimpleRabbit.Cunsuming
 {
     public sealed class ConsumeManager : IConsumeManager
     {
-        private const string _defaultSection = "rabbitMq";
-
-        private IConnection _connection;
-        private IModel _channel;
-        private ConnectionFactory _factory;
-
-        private IRabbitMqConfig _rabbitSettings;
-
-        private bool _disabled;
-
         #region events 
 
         public event EventHandler<ShutdownEventArgs> ConnectionShutdownDetailedEvent;
@@ -44,29 +34,23 @@ namespace SimpleRabbit.Cunsuming
 
         #endregion events 
 
-
         #region fields
+        private const string _defaultSection = "rabbitMq";
+
+        private IConnection _connection;
+        private IModel _channel;
+        private ConnectionFactory _factory;
+
+        private IRabbitMqConfig _rabbitSettings;
+
+        private bool _disabled;
+
+        private readonly HashSet<string> _bindedQueues = new HashSet<string>();
+
+        private readonly Dictionary<string, IConsumer> _consumersDic = new Dictionary<string, IConsumer>();
         #endregion fields
 
-
         #region Properties
-        /// <summary>
-        /// Timeout of trying to reconnect (in seconds). 
-        /// Recommended that the recipient has this value equal to or less than the sender.
-        /// Default to 10 s
-        /// </summary>
-        public int ReconnectTimeout { get; set; } = 10;
-
-        /// <summary>
-        /// Heartbeat timeout to use when negotiating with the server (in seconds).  Default to 60 s
-        /// </summary>
-        public TimeSpan Heartbeat { get; set; } = new TimeSpan(0, 0, 60);
-
-        /// <summary>
-        /// Set to false to disable automatic connection recovery. Defaults to true.
-        /// </summary>
-        public bool AutomaticRecoveryEnabled { get; set; } = true;
-
         /// <summary>
         /// Amount of time client will wait for before re-trying to recover connection. Default to 10 s
         /// </summary>
@@ -98,22 +82,11 @@ namespace SimpleRabbit.Cunsuming
             }
         }
 
-        public string UserName { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
-        public string Password { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
-        public string VirtualHost { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
-        public string HostName { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
-        public int Port { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
-        public int ContinuationTimeout { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
-        public string ExchangePrefix { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
-
-        private readonly HashSet<string> BindedQueues = new HashSet<string>();
-        private readonly Dictionary<string, IConsumer> ConsumersDic = new Dictionary<string, IConsumer>();
-
         #endregion Properties
 
 
         #region .ctor
-        private ConsumeManager(IRabbitMqConfig config) 
+        private ConsumeManager(IRabbitMqConfig config)
         {
             _rabbitSettings = config;
         }
@@ -153,9 +126,9 @@ namespace SimpleRabbit.Cunsuming
                 Password = _rabbitSettings.Password,
                 VirtualHost = _rabbitSettings.VirtualHost,
                 HostName = _rabbitSettings.HostName,
-                AutomaticRecoveryEnabled = AutomaticRecoveryEnabled,
-                NetworkRecoveryInterval = NetworkRecoveryInterval,
-                RequestedHeartbeat = Heartbeat
+                AutomaticRecoveryEnabled = _rabbitSettings.AutomaticRecoveryEnabled,
+                NetworkRecoveryInterval = _rabbitSettings.NetworkRecoveryInterval,
+                RequestedHeartbeat = _rabbitSettings.Heartbeat,
             };
 
             try
@@ -186,7 +159,7 @@ namespace SimpleRabbit.Cunsuming
 
             var exchange = GetExchange<T>();
 
-            if (!BindedQueues.Any(q => q == queue))
+            if (!_bindedQueues.Any(q => q == queue))
             {
                 if (cleanQueue)
                 {
@@ -208,22 +181,22 @@ namespace SimpleRabbit.Cunsuming
 
                 SetConsumer(queue);
 
-                BindedQueues.Add(queue);
+                _bindedQueues.Add(queue);
             }
 
             Channel.ExchangeDeclare(exchange: exchange, type: exchangeType);
             Channel.QueueBind(queue, exchange, routingKey);
 
-            ConsumersDic.Add(exchange, new Consumer<T>(queue, routingKey, handling, exchangeType));
+            _consumersDic.Add(exchange, new Consumer<T>(queue, routingKey, handling, exchangeType));
         }
 
         private void RestartConsumers()
         {
-            foreach (var queue in BindedQueues)
+            foreach (var queue in _bindedQueues)
             {
                 Channel.QueueDeclare(queue, durable: true, exclusive: false, autoDelete: false, arguments: null);
 
-                foreach (var pair in ConsumersDic.Where(q => q.Value.Queue.Equals(queue)))
+                foreach (var pair in _consumersDic.Where(q => q.Value.Queue.Equals(queue)))
                 {
                     Channel.ExchangeDeclare(exchange: pair.Key, type: pair.Value.ExchangeType);
                     Channel.QueueBind(queue: queue, exchange: pair.Key, routingKey: pair.Value.RoutingKey);
@@ -241,7 +214,7 @@ namespace SimpleRabbit.Cunsuming
             {
                 var message = e.Deserialize();
 
-                ConsumersDic.TryGetValue(ConsumersDic.FirstOrDefault(q => q.Key == e.Exchange).Key, out var c);
+                _consumersDic.TryGetValue(_consumersDic.FirstOrDefault(q => q.Key == e.Exchange).Key, out var c);
                 c?.Receive(message);
             };
 
@@ -256,16 +229,16 @@ namespace SimpleRabbit.Cunsuming
             Channel.QueueUnbind(queue, exchange, routingKey);
             Channel.ExchangeDelete(exchange: exchange);
 
-            var consumerKey = ConsumersDic.FirstOrDefault(q => q.Key.Equals(exchange)).Key;
+            var consumerKey = _consumersDic.FirstOrDefault(q => q.Key.Equals(exchange)).Key;
 
-            ConsumersDic.Remove(consumerKey);
+            _consumersDic.Remove(consumerKey);
         }
 
         private string GetExchange<T>()
         {
             return $"{_rabbitSettings.ExchangePrefix}:{typeof(T)}";
         }
-        
+
         private void ConnectionShutdown(object sender, ShutdownEventArgs e)
         {
             if (Connection != null)
@@ -291,9 +264,9 @@ namespace SimpleRabbit.Cunsuming
 
                     break;
                 }
-                catch (Exception ex)
+                catch
                 {
-                    Task.Delay(ReconnectTimeout * 1000).Wait();
+                    Task.Delay(_rabbitSettings.NetworkRecoveryInterval * 1000).Wait();
                 }
             }
         }
